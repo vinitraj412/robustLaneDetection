@@ -35,7 +35,7 @@ int main(){
   		Mat lines;
 		//Mat out(inpt.rows,inpt.cols,CV_8UC3,Scalar(0,0,0));
 		cv::Mat gray;
-		Mat temp=imread("/home/vinit/Desktop/lane_detection/lanes.jpg",1);
+		Mat temp=imread("lanes.jpg",1);
     	cv::cvtColor(temp, gray, CV_BGR2GRAY);
 
 
