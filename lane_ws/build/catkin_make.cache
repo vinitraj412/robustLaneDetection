@@ -1,0 +1,2 @@
+lane_detector
+-DCATKIN_DEVEL_PREFIX=/home/vinit/lane_ws/devel -DCMAKE_INSTALL_PREFIX=/home/vinit/lane_ws/install -G Unix Makefiles

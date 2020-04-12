@@ -1,0 +1,8 @@
+prefix=/home/vinit/lane_ws/install
+
+Name: lane_detector
+Description: Description of lane_detector
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib -llane_detector
+Requires: roscpp rospy std_msgs message_runtime
