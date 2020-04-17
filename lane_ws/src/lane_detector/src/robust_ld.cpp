@@ -254,18 +254,93 @@ public:
 			return bird_eye;
 		}
 
+		Mat apply_gaussian(Mat bird_eye, float angle)
+		{
+			int new_size = (int)sqrt(pow(bird_eye.rows, 2) + pow(bird_eye.cols, 2));
+			Mat temp_mat(new_size, new_size, CV_8UC1, Scalar(0));
+			
+			//Rotating image to given angle
+			int cx = bird_eye.cols/2, cy = bird_eye.rows/2;
+			for(int i=0; i<bird_eye.rows; i++)
+			{
+				for(int j=0; j<bird_eye.cols; j++)
+				{
+					int new_i = (i - cy) * cos(angle * pi / 180) + (j - cx) * sin(angle * pi / 180) + new_size/2;
+					int new_j = (i - cy) * (-sin(angle * pi / 180)) + (j - cx) * cos(angle * pi / 180) + new_size / 2;
+					temp_mat.at<uchar>(new_i, new_j) = bird_eye.at<uchar>(i, j);
+				}
+			}
+
+			Mat extracted1(temp_mat.rows, temp_mat.cols, CV_8UC1, Scalar(0));
+			Mat extracted2(temp_mat.rows, temp_mat.cols, CV_8UC1, Scalar(0));
+			Mat extracted(temp_mat.rows, temp_mat.cols, CV_8UC1, Scalar(0));
+
+			//Then applying 2nd order gaussian
+			GaussianBlur(temp_mat, extracted1, Size(-1, -1), sigma/sqrt(2));
+			GaussianBlur(temp_mat, extracted2, Size(-1, -1), sigma*sqrt(2));
+			extracted = extracted1 - extracted2;
+
+			Mat final_extracted(bird_eye.rows, bird_eye.cols, CV_8UC1, Scalar(0));
+			cx = extracted.cols / 2;
+			cy = extracted.rows / 2;
+
+			//Rotating again with equal and opposite angle
+			for(int i=0; i<extracted.rows; i++)
+			{
+				for(int j=0; j<extracted.cols; j++)
+				{
+					int new_i = (i - cy) * cos(-angle * pi / 180) + (j - cx) * sin(-angle * pi / 180) + bird_eye.rows / 2;
+					int new_j = (i - cy) * (-sin(-angle * pi / 180)) + (j - cx) * cos(-angle * pi / 180) + bird_eye.cols / 2;
+					if(new_i >= 0 && new_i < bird_eye.rows && new_j >= 0 && new_j < bird_eye.cols)
+					{
+						final_extracted.at<uchar>(new_i, new_j) = extracted.at<uchar>(i, j);
+					}
+				}
+			}
+
+			return final_extracted;
+		}
+
 		//Extract vertical lines by applying 2nd order Gaussian
 		Mat extract_lines(Mat bird_eye)
 		{
 
-			Mat extracted1(bird_eye.rows, bird_eye.cols, CV_8UC1, Scalar(0));
-			Mat extracted2(bird_eye.rows, bird_eye.cols, CV_8UC1, Scalar(0));
+			Mat temp1(bird_eye.rows, bird_eye.cols, CV_8UC1, Scalar(0));
+			Mat temp2(bird_eye.rows, bird_eye.cols, CV_8UC1, Scalar(0));
+			Mat extracted_1, extracted_2, extracted_3, extracted_4, extracted_5;
 			Mat extracted(bird_eye.rows, bird_eye.cols, CV_8UC1, Scalar(0));
 			//Sobel(bird_eye, extracted, CV_8U, 2, 0, 3);
-			
-			GaussianBlur(bird_eye, extracted1, Size(-1, -1), sigma/sqrt(2));
-			GaussianBlur(bird_eye, extracted2, Size(-1, -1), sigma*sqrt(2));
-			extracted = extracted1 - extracted2;
+		
+			GaussianBlur(bird_eye, temp1, Size(-1, -1), sigma/sqrt(2));
+			GaussianBlur(bird_eye, temp2, Size(-1, -1), sigma*sqrt(2));
+			extracted_1 = temp1 - temp2; //2nd Order Gaussian at 0 degree angle
+
+			extracted_2 = apply_gaussian(bird_eye, 7.5);	//2nd Order Gaussian at 7.5 degree angle
+			extracted_3 = apply_gaussian(bird_eye, 15);		//2nd Order Gaussian at 15 degree angle
+			extracted_4 = apply_gaussian(bird_eye, -7.5);	//2nd Order Gaussian at -7.5 degree angle
+			extracted_5 = apply_gaussian(bird_eye, -15);	//2nd Order Gaussian at -15 degree angle
+
+			for(int i=0; i<extracted.rows; i++)
+			{
+				for(int j=0; j<extracted.cols; j++)
+				{
+					int max_intensity = extracted_1.at<uchar>(i, j);
+					
+					if(extracted_2.at<uchar>(i, j) > max_intensity)
+						max_intensity = extracted_2.at<uchar>(i, j);
+
+					if(extracted_3.at<uchar>(i, j) > max_intensity)
+						max_intensity = extracted_3.at<uchar>(i, j);
+
+					if(extracted_4.at<uchar>(i, j) > max_intensity)
+						max_intensity = extracted_4.at<uchar>(i, j);
+
+					if(extracted_5.at<uchar>(i, j) > max_intensity)
+						max_intensity = extracted_5.at<uchar>(i, j);
+
+					extracted.at<uchar>(i, j) = max_intensity;
+				}
+			}
 
 			return extracted;
 		}
@@ -485,14 +560,14 @@ public:
 int main()
 {
 	//VideoCapture cap("out1.avi");
-	//VideoWriter video("outcpp.avi",CV_FOURCC('M','J','P','G'),10, Size(480, 360));
+	//VideoWriter video("outcpp.avi",CV_FOURCC('M','J','P','G'),30, Size(480, 360));
 
 	//if(!(cap.isOpened()))
-		//return -1;
+	//	return -1;
 
 	//while(1)
 	//{
-		Mat img = imread("raw_images/25.png", 1);
+		Mat img = imread("raw_images/1.png", 1);
 		//Mat img; 
 		Mat gradient_features, intensity_features;
 		//cap >> img;
@@ -503,18 +578,17 @@ int main()
 		Visual_Features vf(img);
 				
 		gradient_features = Visual_Features::Gradient_Features(&vf).run();
-
-		//cvtColor(gradient_features, gradient_features, CV_GRAY2BGR);
-		//video.write(gradient_features);
-
 		intensity_features = Visual_Features::Intensity_Features(&vf).run();
+
+		//cvtColor(intensity_features, intensity_features, CV_GRAY2BGR);
+		//video.write(intensity_features);
 
 		waitKey(0);
 
 		//Breaks is ESC key is pressed.
 		//char c = (char)waitKey(1);
 		//if(c == 27)
-			//break;
+		//	break;
 	//}
 
 	return 0;
